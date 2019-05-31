@@ -698,16 +698,25 @@ static void load_override_properties() {
  */
 void load_persist_props(void) {
 
-    // Devices with FDE have load_persist_props called twice; the first time when the temporary
-    //data partition is mounted and then again once /data is truly mounted.  We do not want to
-    // read persistent properties from the temporary /data partition or mark persistent properties
-    // as having been loaded during the first call, so we return in that case.
-    std::string crypto_state = android::base::GetProperty("ro.crypto.state", "");
-    std::string crypto_type  = android::base::GetProperty("ro.crypto.type", "");
-    if (crypto_state == "encrypted" && crypto_type == "block") {
-        static size_t num_calls = 0;
-        if (++num_calls == 1) return;
+    /* BEGIN Motorola Hong-Mei Li 2012-09-10, IKJBREL1-5477 */
+    /* To load all default properties for encrypted system. This is mandatory
+     * for re-launch the main class service to be triggered on property, and
+     * that property has no backup on /data (user never changes it at runtime).
+     * Also, we reset persistent_properties_loaded flag to avoid persist props
+     * to be overwrite by default values.
+     */
+    persistent_properties_loaded = false;
+    load_properties_from_file("/system/build.prop", "persist.*");
+    load_properties_from_file("/vendor/build.prop", "persist.*");
+    // Load persist prop from prop.default which defined by PRODUCT_SYSTEM_DEFAULT_PROPERTIES
+    if (!load_properties_from_file("/system/etc/prop.default", "persist.*")) {
+        // Try recovery path
+        if (!load_properties_from_file("/prop.default", "persist.*")) {
+            // Try legacy path
+            load_properties_from_file("/default.prop", "persist.*");
+        }
     }
+    /* END Motorola Hong-Mei Li 2012-09-10, IKJBREL1-5477 */
 
     load_override_properties();
 
